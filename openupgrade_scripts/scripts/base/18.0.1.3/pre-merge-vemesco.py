@@ -12,3 +12,7 @@ def migrate(cr, version):
         openupgrade.logged_query(
             cr,"""UPDATE ir_module_module SET state = 'to upgrade' WHERE name = %s""", (new_module,)
         )
+
+
+    openupgrade.logged_query( cr, """DELETE FROM ir_ui_view WHERE id=2576;""")
+    openupgrade.logged_query(cr, """DELETE FROM ir_ui_view WHERE id=2517;""")

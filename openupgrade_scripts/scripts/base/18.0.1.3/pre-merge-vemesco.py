@@ -14,5 +14,7 @@ def migrate(cr, version):
         )
 
 
-    openupgrade.logged_query( cr, """DELETE FROM ir_ui_view WHERE id=2576;""")
-    openupgrade.logged_query(cr, """DELETE FROM ir_ui_view WHERE id=2517;""")
+    openupgrade.logged_query(cr, """DELETE FROM ir_ui_view WHERE id=2576""")
+    openupgrade.logged_query(cr, """DELETE FROM ir_ui_view WHERE id=2517""")
+    openupgrade.logged_query(cr, """DELETE FROM ir_ui_view WHERE inherit_id=2518""")
+    openupgrade.logged_query(cr, """DELETE FROM ir_ui_view WHERE id=2518""")

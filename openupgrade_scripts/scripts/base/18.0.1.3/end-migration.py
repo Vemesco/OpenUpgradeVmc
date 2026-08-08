@@ -6,6 +6,25 @@ from openupgradelib import openupgrade
 from odoo.addons.base.models.ir_model import MODULE_UNINSTALL_FLAG
 
 
+def _cleanup_deprecated_website_fields(env):
+    """Remove references to removed website fields from copied custom footer views."""
+    openupgrade.logged_query(
+        env.cr,
+        """
+        UPDATE ir_ui_view
+           SET arch_db = regexp_replace(
+               arch_db,
+               '<a[^>]*t-att-href="website\\.social_googleplus"[^>]*>\\s*'
+               '<i[^>]*fa-google-plus-square[^>]*/>\\s*</a>\\s*',
+               '',
+               'g'
+           )
+         WHERE arch_db LIKE %s
+        """,
+        ("%social_googleplus%",),
+    )
+
+
 def _fix_apikeys_table(env, table):
     """
     This table is created manually, so we have to add the new column manually too
@@ -42,3 +61,4 @@ def migrate(env, version):
     env.ref("base.model_res_config_installer").with_context(
         **{MODULE_UNINSTALL_FLAG: True}
     ).unlink()
+    _cleanup_deprecated_website_fields(env)

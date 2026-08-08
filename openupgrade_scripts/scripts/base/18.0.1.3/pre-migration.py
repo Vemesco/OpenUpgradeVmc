@@ -97,7 +97,7 @@ def _clear_non_installable_module_states(cr):
            AND module = 'base'
            AND name = ANY(%s)
         """,
-        (tuple(f"module_{name}" for name in _non_installable_modules),),
+        ([f"module_{name}" for name in _non_installable_modules],),
     )
     openupgrade.logged_query(
         cr,
@@ -142,7 +142,7 @@ def _remove_obsolete_modules(cr):
            AND module = 'base'
            AND name = ANY(%s)
         """,
-        (tuple(f"module_{name}" for name in _obsolete_modules),),
+        ([f"module_{name}" for name in _obsolete_modules],),
     )
     openupgrade.logged_query(
         cr,
@@ -181,6 +181,39 @@ def _bind_vmc_risk_classes_decimal_precision_xmlid(cr):
     )
 
 
+def _backfill_l10n_co_postal_xmlids(cr):
+    """Make l10n_co_edi_jorels postal data idempotent on reruns.
+
+    When postal records already exist but their XML-IDs are missing,
+    module data import tries to insert duplicates. Recreate XML-IDs from
+    existing record ids so CSV data updates records instead.
+    """
+    openupgrade.logged_query(
+        cr,
+        """
+        DO $$
+        BEGIN
+            IF to_regclass('public.l10n_co_edi_jorels_postal') IS NOT NULL THEN
+                INSERT INTO ir_model_data (module, name, model, res_id, noupdate)
+                SELECT 'l10n_co_edi_jorels',
+                       'postal_' || (p.name::integer)::text,
+                       'l10n_co_edi_jorels.postal',
+                       p.id,
+                       TRUE
+                  FROM l10n_co_edi_jorels_postal p
+                 WHERE p.name ~ '^[0-9]+$'
+                ON CONFLICT (module, name)
+                DO UPDATE
+                      SET model = EXCLUDED.model,
+                          res_id = EXCLUDED.res_id,
+                          noupdate = EXCLUDED.noupdate;
+            END IF;
+        END
+        $$;
+        """,
+    )
+
+
 @openupgrade.migrate(use_env=False)
 def migrate(cr, version):
     _clear_non_installable_module_states(cr)
@@ -202,3 +235,4 @@ def migrate(cr, version):
     _fix_serbian_res_lang_record(cr)
     _fix_company_layout_background(cr)
     _bind_vmc_risk_classes_decimal_precision_xmlid(cr)
+    _backfill_l10n_co_postal_xmlids(cr)

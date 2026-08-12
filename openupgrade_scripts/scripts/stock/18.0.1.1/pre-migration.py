@@ -141,21 +141,113 @@ def update_unfill_stock_view(env):
 
 
 def create_scheduler_action(env):
-    res_id = env['ir.actions.server'].create({
-        'name': 'Scheduler Action',
-        'model_id': env.ref('stock.model_stock_scheduler_compute').id,
-        'state': 'code',
-        'code': 'model._procure_orderpoint_confirm()',
-        'usage': 'ir_actions_server',
-    })
+    # The stock menu references this XMLID during data loading.
+    # Some migrated databases lose it, which crashes stock XML import.
     env.cr.execute(
-        """INSERT INTO ir_model_data (name, module, model, res_id)
-           SELECT 'ir_cron_scheduler_action_ir_actions_server',
-                  'stock',
-                  'ir.actions.server',
-                  id
-           FROM ir_act_server
-           WHERE id = %s""", (res_id.id,))
+        """
+        SELECT imd.res_id
+        FROM ir_model_data imd
+        JOIN ir_act_server ias ON ias.id = imd.res_id
+        WHERE imd.module = 'stock'
+          AND imd.name = 'ir_cron_scheduler_action_ir_actions_server'
+          AND imd.model = 'ir.actions.server'
+        LIMIT 1
+        """
+    )
+    if env.cr.fetchone():
+        return
+
+    # Remove broken XMLID rows that point to missing action records.
+    env.cr.execute(
+        """
+        DELETE FROM ir_model_data
+        WHERE module = 'stock'
+          AND name = 'ir_cron_scheduler_action_ir_actions_server'
+        """
+    )
+
+    env.cr.execute(
+        """
+        SELECT id
+        FROM ir_model
+        WHERE model IN ('stock.scheduler.compute', 'stock.move')
+        ORDER BY CASE model WHEN 'stock.scheduler.compute' THEN 0 ELSE 1 END
+        LIMIT 1
+        """
+    )
+    model_row = env.cr.fetchone()
+    if not model_row:
+        return
+    model_id = model_row[0]
+
+    env.cr.execute(
+        """
+        INSERT INTO ir_act_server (
+            name,
+            type,
+            state,
+            usage,
+            model_id,
+            code,
+            binding_type,
+            create_uid,
+            write_uid,
+            create_date,
+            write_date
+        )
+        VALUES (
+            'Scheduler Action',
+            'ir.actions.server',
+            'code',
+            'ir_actions_server',
+            %s,
+            'model._procure_orderpoint_confirm()',
+            'action',
+            1,
+            1,
+            NOW(),
+            NOW()
+        )
+        RETURNING id
+        """,
+        (model_id,),
+    )
+    action_id = env.cr.fetchone()[0]
+
+    env.cr.execute(
+        """
+        INSERT INTO ir_model_data (
+            module,
+            name,
+            model,
+            res_id,
+            noupdate,
+            create_uid,
+            write_uid,
+            create_date,
+            write_date
+        )
+        VALUES (
+            'stock',
+            'ir_cron_scheduler_action_ir_actions_server',
+            'ir.actions.server',
+            %s,
+            TRUE,
+            1,
+            1,
+            NOW(),
+            NOW()
+        )
+        ON CONFLICT (module, name)
+        DO UPDATE
+        SET model = EXCLUDED.model,
+            res_id = EXCLUDED.res_id,
+            noupdate = EXCLUDED.noupdate,
+            write_uid = EXCLUDED.write_uid,
+            write_date = EXCLUDED.write_date
+        """,
+        (action_id,),
+    )
 
 
 @openupgrade.migrate()

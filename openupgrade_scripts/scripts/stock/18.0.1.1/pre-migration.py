@@ -180,39 +180,16 @@ def create_scheduler_action(env):
         return
     model_id = model_row[0]
 
-    env.cr.execute(
-        """
-        INSERT INTO ir_act_server (
-            name,
-            type,
-            state,
-            usage,
-            model_id,
-            code,
-            binding_type,
-            create_uid,
-            write_uid,
-            create_date,
-            write_date
-        )
-        VALUES (
-            'Scheduler Action',
-            'ir.actions.server',
-            'code',
-            'ir_actions_server',
-            %s,
-            'model._procure_orderpoint_confirm()',
-            'action',
-            1,
-            1,
-            NOW(),
-            NOW()
-        )
-        RETURNING id
-        """,
-        (model_id,),
-    )
-    action_id = env.cr.fetchone()[0]
+    action_id = env["ir.actions.server"].create(
+        {
+            "name": "Scheduler Action",
+            "model_id": model_id,
+            "state": "code",
+            "code": "model._procure_orderpoint_confirm()",
+            "usage": "ir_actions_server",
+            "binding_type": "action",
+        }
+    ).id
 
     env.cr.execute(
         """

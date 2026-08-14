@@ -105,6 +105,17 @@ def _clear_invalid_user_home_actions(env):
                     )
                 """
         )
+        env.cr.execute(
+                """
+                UPDATE res_users u
+                SET action_id = NULL
+                WHERE action_id IN (
+                    SELECT c.id
+                    FROM ir_act_client c
+                    WHERE c.tag = 'reload'
+                )
+                """
+        )
 
 
 @openupgrade.migrate()

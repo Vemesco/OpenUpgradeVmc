@@ -11,15 +11,21 @@ def _cleanup_deprecated_website_fields(env):
     openupgrade.logged_query(
         env.cr,
         """
-        UPDATE ir_ui_view
-           SET arch_db = regexp_replace(
-               arch_db,
-               '<a[^>]*t-att-href="website\\.social_googleplus"[^>]*>\\s*'
-               '<i[^>]*fa-google-plus-square[^>]*/>\\s*</a>\\s*',
-               '',
-               'g'
+        UPDATE ir_ui_view v
+           SET arch_db = (
+               SELECT jsonb_object_agg(
+                   t.key,
+                   regexp_replace(
+                       t.value,
+                       '<a[^>]*t-att-href="website\\.social_googleplus"[^>]*>\\s*'
+                       '<i[^>]*fa-google-plus-square[^>]*/>\\s*</a>\\s*',
+                       '',
+                       'g'
+                   )
+               )
+               FROM jsonb_each_text(v.arch_db) t
            )
-         WHERE arch_db LIKE %s
+         WHERE v.arch_db::text LIKE %s
         """,
         ("%social_googleplus%",),
     )
